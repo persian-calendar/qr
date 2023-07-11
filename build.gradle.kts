@@ -20,6 +20,8 @@ dependencies {
     testImplementation(kotlin("stdlib-jdk8"))
     testImplementation(kotlin("test"))
     implementation(kotlin("stdlib-jdk8"))
+    // Can be used to check the validity of our result but isn't used for now.
+    // testImplementation("com.google.zxing:core:3.5.1")
 }
 
 tasks.test {
