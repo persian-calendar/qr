@@ -3,17 +3,25 @@ package io.github.persiancalendar.qr
 import kotlin.math.absoluteValue
 import kotlin.math.max
 
+/**
+ * An enumeration of error correction levels to recover from dirty/damaged displayed Qr.
+ * L is least percent of error correction padding and H is the most.
+ * Tolerance percent: Level L 7%, Level M 15%, Level Q 25%, Level H 30%
+ */
 enum class ErrorCorrectionLevel(internal val value: Int) { L(1), M(0), Q(3), H(2) }
 
+/**
+ * Canonical API of the library
+ * @return An immutable 2D list of boolean, a dot matrix.
+ * */
 fun qr(
+    /** Input text to be displayed. A string as it's limited UTF-8 variant of qr */
     input: String,
-    // Level L can be dirty/damaged for up to 7%, level M 15%, level Q 25%, level H 30%
-    // Default or null is M except when it exceeds the space it falls back to L when null is set.
+    /** Optional error correction level config, default or null is M except when it exceeds the space it falls back to L */
     errorCorrectionLevel_: ErrorCorrectionLevel? = null,
-    // [1-40], set it to null for auto-size https://www.qrcode.com/en/about/version.html
+    /** An optional number between [1-40], set it to null for auto-size https://www.qrcode.com/en/about/version.html */
     version_: Int? = null,
 ): List<List<Boolean>> {
-    // This is a UTF-8 only implementation anyway
     val data = input.encodeToByteArray()
 
     val errorCorrectionLevel = errorCorrectionLevel_ ?: ErrorCorrectionLevel.M
@@ -29,8 +37,10 @@ fun qr(
         val totalDataCount = rsBlocks.sumOf(Rs::dataCount)
 
         buffer.sizeInBits <= totalDataCount * 8
-    } ?: return if (errorCorrectionLevel_ == null)
-        qr(input, ErrorCorrectionLevel.L, null) else emptyList()
+    } ?: return run {
+        if (errorCorrectionLevel_ == null) qr(input, ErrorCorrectionLevel.L, null)
+        else emptyList()
+    }
 
     val size = version * 4 + 17
     val modules = List(size) { MutableList<Boolean?>(size) { null } }
