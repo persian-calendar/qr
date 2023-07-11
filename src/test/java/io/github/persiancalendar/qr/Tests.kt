@@ -1,6 +1,5 @@
 package io.github.persiancalendar.qr
 
-import io.github.persiancalendar.qr.qr
 import org.junit.jupiter.api.Test
 import kotlin.math.ceil
 import kotlin.test.assertEquals
