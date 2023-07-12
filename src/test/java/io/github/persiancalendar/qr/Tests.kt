@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test
 import kotlin.math.ceil
 import kotlin.test.assertEquals
 
-class QrTests {
+class Tests {
     @Test
     fun `basic qr test`() {
         val expected = """

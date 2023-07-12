@@ -86,13 +86,15 @@ private enum class MaskPattern(val maskFunction: (Int, Int) -> Boolean) {
 }
 
 private fun setupPositionProbePattern(modules: List<MutableList<Boolean?>>, row: Int, col: Int) {
-    (-1..7).forEach r@{ r ->
-        if (row + r <= -1 || modules.size <= row + r) return@r
-        (-1..7).forEach c@{ c ->
-            if (col + c <= -1 || modules.size <= col + c) return@c
-            modules[row + r][col + c] = (r in 0..6 && (c == 0 || c == 6)) ||
-                    (c in 0..6 && (r == 0 || r == 6)) ||
-                    (r in 2..4 && 2 <= c && c <= 4)
+    (-1..7).forEach { r ->
+        if (row + r > -1 && modules.size > row + r) {
+            (-1..7).forEach { c ->
+                if (col + c > -1 && modules.size > col + c) {
+                    modules[row + r][col + c] = (r in 0..6 && (c == 0 || c == 6)) ||
+                            (c in 0..6 && (r == 0 || r == 6)) ||
+                            (r in 2..4 && 2 <= c && c <= 4)
+                }
+            }
         }
     }
 }
@@ -100,13 +102,14 @@ private fun setupPositionProbePattern(modules: List<MutableList<Boolean?>>, row:
 private fun setupPositionAdjustPattern(modules: List<MutableList<Boolean?>>, version: Int) {
     val pos = QrUtil.getPatternPosition(version)
 
-    pos.forEach r@{ row ->
-        pos.forEach c@{ col ->
-            if (modules[row][col] != null) return@c
-            (-2..2).forEach { r ->
-                (-2..2).forEach { c ->
-                    modules[row + r][col + c] =
-                        r == -2 || r == 2 || c == -2 || c == 2 || (r == 0 && c == 0)
+    pos.forEach { row ->
+        pos.forEach { col ->
+            if (modules[row][col] == null) {
+                (-2..2).forEach { r ->
+                    (-2..2).forEach { c ->
+                        modules[row + r][col + c] =
+                            r == -2 || r == 2 || c == -2 || c == 2 || (r == 0 && c == 0)
+                    }
                 }
             }
         }
