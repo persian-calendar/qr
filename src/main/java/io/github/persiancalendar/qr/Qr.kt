@@ -252,7 +252,7 @@ private fun getLostPoint(matrix: List<List<Boolean>>): Double {
     // LEVEL4
     val darkCount = (0..<size).sumOf { col -> (0..<size).count { row -> matrix[row][col] } }
 
-    val ratio = abs((100 * darkCount) / size / size - 50) / 5
+    val ratio = abs((100.0 * darkCount) / size / size - 50) / 5
     lostPoint += ratio * 10
 
     return lostPoint
