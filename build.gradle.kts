@@ -1,4 +1,4 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     kotlin("jvm") version "2.2.0"
@@ -13,7 +13,7 @@ repositories {
 }
 
 dependencies {
-    val junit5Version = "5.13.1"
+    val junit5Version = "5.13.2"
     testImplementation("org.junit.jupiter:junit-jupiter-api:$junit5Version")
     testImplementation("org.junit.jupiter:junit-jupiter-params:$junit5Version")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:$junit5Version")
@@ -28,10 +28,11 @@ tasks.test {
     useJUnitPlatform()
 }
 
-val javaVersion = JavaVersion.VERSION_17
-
-configure<JavaPluginExtension> {
-    sourceCompatibility = javaVersion
+val javaVersion = JavaVersion.VERSION_21
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.fromTarget(javaVersion.majorVersion)
+    }
 }
 
 val sourceJar by tasks.creating(Jar::class) {
@@ -47,9 +48,4 @@ publishing {
             artifact(sourceJar)
         }
     }
-}
-
-val compileKotlin: KotlinCompile by tasks
-compileKotlin.kotlinOptions {
-    jvmTarget = javaVersion.majorVersion
 }
