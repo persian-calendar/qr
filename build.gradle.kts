@@ -33,7 +33,7 @@ kotlin {
     compilerOptions { jvmTarget = JvmTarget.JVM_21 }
 }
 
-val sourceJar by tasks.creating(Jar::class) {
+val sourceJar by tasks.registering(Jar::class) {
     dependsOn(tasks["classes"])
     archiveClassifier.set("sources")
     from(sourceSets["main"].allSource)
