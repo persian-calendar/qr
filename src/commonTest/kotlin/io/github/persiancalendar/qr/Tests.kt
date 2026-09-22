@@ -1,10 +1,11 @@
 package io.github.persiancalendar.qr
 
-import org.junit.jupiter.api.Test
 import kotlin.math.ceil
+import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class Tests {
+
     @Test
     fun `basic qr test`() {
         val expected = """
