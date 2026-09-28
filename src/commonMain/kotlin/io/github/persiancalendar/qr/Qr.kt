@@ -18,16 +18,16 @@ fun qr(
     /** Input text to be displayed. A string as it's limited UTF-8 variant of qr */
     input: String,
     /** Optional error correction level config, default or null is M except when it exceeds the space it falls back to L */
-    errorCorrectionLevel_: ErrorCorrectionLevel? = null,
+    errorCorrectionLevel: ErrorCorrectionLevel? = null,
     /** An optional number between [1-40], set it to null for auto-size https://www.qrcode.com/en/about/version.html */
-    version_: Int? = null,
+    version: Int? = null,
 ): List<BooleanArray> {
     val data = input.encodeToByteArray()
 
-    val errorCorrectionLevel = errorCorrectionLevel_ ?: ErrorCorrectionLevel.M
+    val finalErrorCorrectionLevel = errorCorrectionLevel ?: ErrorCorrectionLevel.M
 
-    val version = version_ ?: (1..40).firstOrNull {
-        val rsBlocks = QrRsBlock.getRsBlocks(it, errorCorrectionLevel)
+    val finalVersion = version ?: (1..40).firstOrNull {
+        val rsBlocks = QrRsBlock.getRsBlocks(it, finalErrorCorrectionLevel)
         val buffer = QrBitBuffer()
 
         buffer.put(4, 4)
@@ -38,16 +38,16 @@ fun qr(
 
         buffer.sizeInBits <= totalDataCount * 8
     } ?: return run {
-        if (errorCorrectionLevel_ == null) qr(input, ErrorCorrectionLevel.L, null)
+        if (errorCorrectionLevel == null) qr(input, ErrorCorrectionLevel.L, null)
         else emptyList()
     }
 
-    val size = version * 4 + 17
+    val size = finalVersion * 4 + 17
 
     val modules = Array(size) { BooleanArray(size) }
     val reserved = Array(size) { BooleanArray(size) }
 
-    val cache = createData(version, errorCorrectionLevel, data)
+    val cache = createData(finalVersion, finalErrorCorrectionLevel, data)
 
     fun reset() {
         modules.forEach { it.fill(false) }
@@ -60,11 +60,11 @@ fun qr(
         setupPositionProbePattern(modules, reserved, 0, 0)
         setupPositionProbePattern(modules, reserved, size - 7, 0)
         setupPositionProbePattern(modules, reserved, 0, size - 7)
-        setupPositionAdjustPattern(modules, reserved, version)
+        setupPositionAdjustPattern(modules, reserved, finalVersion)
         setupTimingPattern(modules, reserved)
-        setupTypeInfo(modules, reserved, test, maskPattern, errorCorrectionLevel)
+        setupTypeInfo(modules, reserved, test, maskPattern, finalErrorCorrectionLevel)
 
-        if (version >= 7) setupVersionNumber(modules, reserved, version, test)
+        if (finalVersion >= 7) setupVersionNumber(modules, reserved, finalVersion, test)
 
         mapData(modules, reserved, cache, maskPattern)
     }
