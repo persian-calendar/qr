@@ -21,7 +21,7 @@ fun qr(
     errorCorrectionLevel_: ErrorCorrectionLevel? = null,
     /** An optional number between [1-40], set it to null for auto-size https://www.qrcode.com/en/about/version.html */
     version_: Int? = null,
-): List<List<Boolean>> {
+): List<BooleanArray> {
     val data = input.encodeToByteArray()
 
     val errorCorrectionLevel = errorCorrectionLevel_ ?: ErrorCorrectionLevel.M
@@ -43,32 +43,40 @@ fun qr(
     }
 
     val size = version * 4 + 17
-    val modules = List(size) { MutableList<Boolean?>(size) { null } }
+
+    val modules = Array(size) { BooleanArray(size) }
+    val reserved = Array(size) { BooleanArray(size) }
 
     val cache = createData(version, errorCorrectionLevel, data)
 
+    fun reset() {
+        modules.forEach { it.fill(false) }
+        reserved.forEach { it.fill(false) }
+    }
+
     fun make(test: Boolean, maskPattern: MaskPattern) {
-        repeat(size) { row -> repeat(size) { col -> modules[row][col] = null } }
+        reset()
 
-        setupPositionProbePattern(modules, 0, 0)
-        setupPositionProbePattern(modules, size - 7, 0)
-        setupPositionProbePattern(modules, 0, size - 7)
-        setupPositionAdjustPattern(modules, version)
-        setupTimingPattern(modules)
-        setupTypeInfo(modules, test, maskPattern, errorCorrectionLevel)
+        setupPositionProbePattern(modules, reserved, 0, 0)
+        setupPositionProbePattern(modules, reserved, size - 7, 0)
+        setupPositionProbePattern(modules, reserved, 0, size - 7)
+        setupPositionAdjustPattern(modules, reserved, version)
+        setupTimingPattern(modules, reserved)
+        setupTypeInfo(modules, reserved, test, maskPattern, errorCorrectionLevel)
 
-        if (version >= 7) setupVersionNumber(modules, version, test)
+        if (version >= 7) setupVersionNumber(modules, reserved, version, test)
 
-        mapData(modules, cache, maskPattern)
+        mapData(modules, reserved, cache, maskPattern)
     }
 
     val bestPattern = MaskPattern.entries.minBy { pattern ->
         make(true, pattern)
-        getLostPoint(modules.map { row -> row.map { it!! } })
+        getLostPoint(modules)
     }
 
     make(false, bestPattern)
-    return modules.map { row -> row.map { it!! } }
+
+    return modules.asList()
 }
 
 private const val pad0 = 0xec
@@ -85,30 +93,42 @@ private enum class MaskPattern(val maskFunction: (Int, Int) -> Boolean) {
     Pattern111({ i, j -> (((i * j) % 3) + ((i + j) % 2)) % 2 == 0 }),
 }
 
-private fun setupPositionProbePattern(modules: List<MutableList<Boolean?>>, row: Int, col: Int) {
+private fun setupPositionProbePattern(
+    modules: Array<BooleanArray>,
+    reserved: Array<BooleanArray>,
+    row: Int,
+    col: Int,
+) {
     (-1..7).forEach { r ->
-        if (row + r > -1 && modules.size > row + r) {
-            (-1..7).forEach { c ->
-                if (col + c > -1 && modules.size > col + c) {
-                    modules[row + r][col + c] = (r in 0..6 && (c == 0 || c == 6)) ||
-                            (c in 0..6 && (r == 0 || r == 6)) ||
-                            (r in 2..4 && 2 <= c && c <= 4)
+        val rr = row + r
+        if (rr in modules.indices) {
+            for (c in -1..7) {
+                val cc = col + c
+                if (cc in modules.indices) {
+                    modules[rr][cc] =
+                        (r in 0..6 && (c == 0 || c == 6)) || (c in 0..6 && (r == 0 || r == 6)) || (r in 2..4 && c in 2..4)
+                    reserved[rr][cc] = true
                 }
             }
         }
     }
 }
 
-private fun setupPositionAdjustPattern(modules: List<MutableList<Boolean?>>, version: Int) {
+private fun setupPositionAdjustPattern(
+    modules: Array<BooleanArray>,
+    reserved: Array<BooleanArray>,
+    version: Int,
+) {
     val pos = QrUtil.getPatternPosition(version)
 
     pos.forEach { row ->
         pos.forEach { col ->
-            if (modules[row][col] == null) {
+            if (!reserved[row][col]) {
                 (-2..2).forEach { r ->
                     (-2..2).forEach { c ->
                         modules[row + r][col + c] =
                             r == -2 || r == 2 || c == -2 || c == 2 || (r == 0 && c == 0)
+                        reserved[row + r][col + c] = true
                     }
                 }
             }
@@ -116,59 +136,91 @@ private fun setupPositionAdjustPattern(modules: List<MutableList<Boolean?>>, ver
     }
 }
 
-private fun setupTimingPattern(modules: List<MutableList<Boolean?>>) {
-    (8..<modules.size - 8).forEach { r -> if (modules[r][6] == null) modules[r][6] = r % 2 == 0 }
+private fun setupTimingPattern(modules: Array<BooleanArray>, reserved: Array<BooleanArray>) {
+    val size = modules.size
 
-    (8..<modules.size - 8).forEach { c -> if (modules[6][c] == null) modules[6][c] = c % 2 == 0 }
+    (8..<size - 8).forEach { r ->
+        if (!reserved[r][6]) {
+            modules[r][6] = r % 2 == 0
+            reserved[r][6] = true
+        }
+    }
+
+    (8..<size - 8).forEach { c ->
+        if (!reserved[6][c]) {
+            modules[6][c] = c % 2 == 0
+            reserved[6][c] = true
+        }
+    }
 }
 
 private fun setupTypeInfo(
-    modules: List<MutableList<Boolean?>>,
+    modules: Array<BooleanArray>,
+    reserved: Array<BooleanArray>,
     test: Boolean,
     maskPattern: MaskPattern,
     errorCorrectionLevel: ErrorCorrectionLevel,
 ) {
     val data = errorCorrectionLevel.value.shl(3).or(maskPattern.ordinal)
     val bits = QrUtil.getBchTypeInfo(data)
+    val size = modules.size
 
     // vertical
-    repeat(15) {
-        modules[when {
-            it < 6 -> it
-            it < 8 -> it + 1
-            else -> modules.size - 15 + it
-        }][8] = !test && bits.shr(it).and(1) == 1
+    repeat(15) { i ->
+        val row = when {
+            i < 6 -> i
+            i < 8 -> i + 1
+            else -> size - 15 + i
+        }
+        modules[row][8] = !test && bits.shr(i).and(1) == 1
+        reserved[row][8] = true
     }
 
     // horizontal
-    repeat(15) {
-        modules[8][when {
-            it < 8 -> modules.size - it - 1
-            it < 9 -> 15 - it - 1 + 1
-            else -> 15 - it - 1
-        }] = !test && bits.shr(it).and(1) == 1
+    repeat(15) { i ->
+        val col = when {
+            i < 8 -> size - i - 1
+            i < 9 -> 15 - i - 1 + 1
+            else -> 15 - i - 1
+        }
+        modules[8][col] = !test && bits.shr(i).and(1) == 1
+        reserved[8][col] = true
     }
 
     // fixed module
-    modules[modules.size - 8][8] = !test
+    modules[size - 8][8] = !test
+    reserved[size - 8][8] = true
 }
 
-private fun setupVersionNumber(modules: List<MutableList<Boolean?>>, version: Int, test: Boolean) {
+private fun setupVersionNumber(
+    modules: Array<BooleanArray>,
+    reserved: Array<BooleanArray>,
+    version: Int,
+    test: Boolean,
+) {
     val bits = QrUtil.getBchTypeNumber(version)
+    val size = modules.size
 
-    repeat(18) {
-        val mod = !test && bits.shr(it).and(1) == 1
-        modules[it / 3][(it % 3) + modules.size - 8 - 3] = mod
+    repeat(18) { i ->
+        val mod = !test && bits.shr(i).and(1) == 1
+        val row = i / 3
+        val col = (i % 3) + size - 8 - 3
+        modules[row][col] = mod
+        reserved[row][col] = true
     }
 
-    repeat(18) {
-        val mod = !test && bits.shr(it).and(1) == 1
-        modules[(it % 3) + modules.size - 8 - 3][it / 3] = mod
+    repeat(18) { i ->
+        val mod = !test && bits.shr(i).and(1) == 1
+        val row = (i % 3) + size - 8 - 3
+        val col = i / 3
+        modules[row][col] = mod
+        reserved[row][col] = true
     }
 }
 
 private fun mapData(
-    modules: List<MutableList<Boolean?>>,
+    modules: Array<BooleanArray>,
+    reserved: Array<BooleanArray>,
     data: List<Int>,
     maskPattern: MaskPattern,
 ) {
@@ -184,8 +236,9 @@ private fun mapData(
 
         while (true) {
             repeat(2) { c ->
-                if (modules[row][col - c] == null) {
-                    modules[row][col - c] = maskFunc(row, col - c).xor(
+                val cc = col - c
+                if (!reserved[row][cc]) {
+                    modules[row][cc] = maskFunc(row, cc).xor(
                         byteIndex < data.size && data[byteIndex].ushr(bitIndex).and(1) == 1
                     )
                     bitIndex -= 1
@@ -209,7 +262,7 @@ private fun mapData(
     }
 }
 
-private fun getLostPoint(matrix: List<List<Boolean>>): Double {
+private fun getLostPoint(matrix: Array<BooleanArray>): Double {
     val size = matrix.size
     var lostPoint = .0
 
@@ -218,9 +271,8 @@ private fun getLostPoint(matrix: List<List<Boolean>>): Double {
         repeat(size) { col ->
             val isDark = matrix[row][col]
             val sameCount = (-1..1).sumOf { r ->
-                if (row + r in 0..<size) (-1..1).count {
-                    col + it in 0..<size &&
-                            !(r == 0 && it == 0) && isDark == matrix[row + r][col + it]
+                if (row + r in 0..<size) (-1..1).count { c ->
+                    col + c in 0..<size && !(r == 0 && c == 0) && isDark == matrix[row + r][col + c]
                 } else 0
             }
 
@@ -231,7 +283,9 @@ private fun getLostPoint(matrix: List<List<Boolean>>): Double {
     // LEVEL2
     repeat(size - 1) { row ->
         repeat(size - 1) { col ->
-            val count = (0..1).sumOf { r -> (0..1).count { c -> matrix[row + r][col + c] } }
+            val count = (0..1).sumOf { r ->
+                (0..1).count { c -> matrix[row + r][col + c] }
+            }
             if (count == 0 || count == 4) lostPoint += 3
         }
     }
@@ -250,7 +304,9 @@ private fun getLostPoint(matrix: List<List<Boolean>>): Double {
     } * 40.0
 
     // LEVEL4
-    val darkCount = (0..<size).sumOf { col -> (0..<size).count { row -> matrix[row][col] } }
+    val darkCount = (0..<size).sumOf { col ->
+        (0..<size).count { row -> matrix[row][col] }
+    }
 
     val ratio = abs((100.0 * darkCount) / size / size - 50) / 5
     lostPoint += ratio * 10
@@ -395,7 +451,7 @@ private object QrUtil {
         listOf(6, 28, 54, 80, 106, 132, 158),
         listOf(6, 32, 58, 84, 110, 136, 162),
         listOf(6, 26, 54, 82, 110, 138, 166),
-        listOf(6, 30, 58, 86, 114, 142, 17),
+        listOf(6, 30, 58, 86, 114, 142, 170),
     )
 
     private const val g15 = 1.shl(10)
@@ -476,7 +532,9 @@ private object QrMath {
     }
 
     fun gLog(n: Int): Int = if (n < 1) error("gLog($n)") else logTable[n]
-    fun gExp(n: Int): Int = // Deal with negative and don't rely on mod/rem differences
+
+    // Deal with negative and don't rely on mod/rem differences
+    fun gExp(n: Int): Int =
         expTable[if (n == 0) 0 else if (n < 0) 254 - (-n - 1) % 255 else (n - 1) % 255 + 1]
 }
 
