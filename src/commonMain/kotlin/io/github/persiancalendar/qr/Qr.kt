@@ -1,5 +1,6 @@
 package io.github.persiancalendar.qr
 
+import kotlin.jvm.JvmInline
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -10,18 +11,43 @@ import kotlin.math.max
  */
 enum class ErrorCorrectionLevel(internal val value: Int) { L(1), M(0), Q(3), H(2) }
 
-/**
- * Canonical API of the library
- * @return An immutable 2D list of boolean, a dot matrix.
- * */
-fun qr(
-    /** Input text to be displayed. A string as it's limited UTF-8 variant of qr */
-    input: String,
-    /** Optional error correction level config, default or null is M except when it exceeds the space it falls back to L */
-    errorCorrectionLevel: ErrorCorrectionLevel? = null,
-    /** An optional number between [1-40], set it to null for auto-size https://www.qrcode.com/en/about/version.html */
-    version: Int? = null,
-): List<BooleanArray> {
+internal class Bitmap(val size: Int) {
+    private val data = BooleanArray(size * size)
+    fun clear() = data.fill(false)
+    operator fun get(x: Int, y: Int) = data[x * size + y]
+    operator fun set(x: Int, y: Int, value: Boolean) {
+        data[x * size + y] = value
+    }
+    fun getOrFalse(x: Int, y: Int): Boolean {
+        val index = x * size + y
+        return if (index in data.indices) data[index] else false
+    }
+}
+
+@JvmInline
+value class Qr internal constructor(private val data: Bitmap) {
+    val size get() = data.size
+
+    // Let's provide a relaxed API for a client
+    operator fun get(x: Int, y: Int): Boolean = data.getOrFalse(x, y)
+
+    /**
+     * Canonical API of the library
+     * @return An immutable dot matrix.
+     * */
+    constructor(
+        /** Input text to be displayed. A string as it's limited UTF-8 variant of qr */
+        input: String,
+        /** Optional error correction level config, default or null is M except when it exceeds the space it falls back to L */
+        errorCorrectionLevel: ErrorCorrectionLevel? = null,
+        /** An optional number between [1-40], set it to null for auto-size https://www.qrcode.com/en/about/version.html */
+        version: Int? = null,
+    ) : this(qr(input, errorCorrectionLevel, version))
+}
+
+private fun qr(
+    input: String, errorCorrectionLevel: ErrorCorrectionLevel?, version: Int?
+): Bitmap {
     val data = input.encodeToByteArray()
 
     val finalErrorCorrectionLevel = errorCorrectionLevel ?: ErrorCorrectionLevel.M
@@ -39,23 +65,19 @@ fun qr(
         buffer.sizeInBits <= totalDataCount * 8
     } ?: return run {
         if (errorCorrectionLevel == null) qr(input, ErrorCorrectionLevel.L, null)
-        else emptyList()
+        else Bitmap(0)
     }
 
     val size = finalVersion * 4 + 17
 
-    val modules = Array(size) { BooleanArray(size) }
-    val reserved = Array(size) { BooleanArray(size) }
+    val modules = Bitmap(size)
+    val reserved = Bitmap(size)
 
     val cache = createData(finalVersion, finalErrorCorrectionLevel, data)
 
-    fun reset() {
-        modules.forEach { it.fill(false) }
-        reserved.forEach { it.fill(false) }
-    }
-
     fun make(test: Boolean, maskPattern: MaskPattern) {
-        reset()
+        modules.clear()
+        reserved.clear()
 
         setupPositionProbePattern(modules, reserved, 0, 0)
         setupPositionProbePattern(modules, reserved, size - 7, 0)
@@ -76,7 +98,7 @@ fun qr(
 
     make(false, bestPattern)
 
-    return modules.asList()
+    return modules
 }
 
 private const val pad0 = 0xec
@@ -93,42 +115,32 @@ private enum class MaskPattern(val maskFunction: (Int, Int) -> Boolean) {
     Pattern111({ i, j -> (((i * j) % 3) + ((i + j) % 2)) % 2 == 0 }),
 }
 
-private fun setupPositionProbePattern(
-    modules: Array<BooleanArray>,
-    reserved: Array<BooleanArray>,
-    row: Int,
-    col: Int,
-) {
+private fun setupPositionProbePattern(modules: Bitmap, reserved: Bitmap, row: Int, col: Int) {
+    val size = modules.size
     (-1..7).forEach { r ->
         val rr = row + r
-        if (rr in modules.indices) {
-            for (c in -1..7) {
-                val cc = col + c
-                if (cc in modules.indices) {
-                    modules[rr][cc] =
-                        (r in 0..6 && (c == 0 || c == 6)) || (c in 0..6 && (r == 0 || r == 6)) || (r in 2..4 && c in 2..4)
-                    reserved[rr][cc] = true
-                }
+        if (rr in 0..<size) (-1..7).forEach { c ->
+            val cc = col + c
+            if (cc in 0..<size) {
+                modules[rr, cc] =
+                    (r in 0..6 && (c == 0 || c == 6)) || (c in 0..6 && (r == 0 || r == 6)) || (r in 2..4 && c in 2..4)
+                reserved[rr, cc] = true
             }
         }
     }
 }
 
-private fun setupPositionAdjustPattern(
-    modules: Array<BooleanArray>,
-    reserved: Array<BooleanArray>,
-    version: Int,
-) {
+private fun setupPositionAdjustPattern(modules: Bitmap, reserved: Bitmap, version: Int) {
     val pos = QrUtil.getPatternPosition(version)
 
     pos.forEach { row ->
         pos.forEach { col ->
-            if (!reserved[row][col]) {
+            if (!reserved[row, col]) {
                 (-2..2).forEach { r ->
                     (-2..2).forEach { c ->
-                        modules[row + r][col + c] =
+                        modules[row + r, col + c] =
                             r == -2 || r == 2 || c == -2 || c == 2 || (r == 0 && c == 0)
-                        reserved[row + r][col + c] = true
+                        reserved[row + r, col + c] = true
                     }
                 }
             }
@@ -136,27 +148,27 @@ private fun setupPositionAdjustPattern(
     }
 }
 
-private fun setupTimingPattern(modules: Array<BooleanArray>, reserved: Array<BooleanArray>) {
+private fun setupTimingPattern(modules: Bitmap, reserved: Bitmap) {
     val size = modules.size
 
     (8..<size - 8).forEach { r ->
-        if (!reserved[r][6]) {
-            modules[r][6] = r % 2 == 0
-            reserved[r][6] = true
+        if (!reserved[r, 6]) {
+            modules[r, 6] = r % 2 == 0
+            reserved[r, 6] = true
         }
     }
 
     (8..<size - 8).forEach { c ->
-        if (!reserved[6][c]) {
-            modules[6][c] = c % 2 == 0
-            reserved[6][c] = true
+        if (!reserved[6, c]) {
+            modules[6, c] = c % 2 == 0
+            reserved[6, c] = true
         }
     }
 }
 
 private fun setupTypeInfo(
-    modules: Array<BooleanArray>,
-    reserved: Array<BooleanArray>,
+    modules: Bitmap,
+    reserved: Bitmap,
     test: Boolean,
     maskPattern: MaskPattern,
     errorCorrectionLevel: ErrorCorrectionLevel,
@@ -172,8 +184,8 @@ private fun setupTypeInfo(
             i < 8 -> i + 1
             else -> size - 15 + i
         }
-        modules[row][8] = !test && bits.shr(i).and(1) == 1
-        reserved[row][8] = true
+        modules[row, 8] = !test && bits.shr(i).and(1) == 1
+        reserved[row, 8] = true
     }
 
     // horizontal
@@ -183,21 +195,16 @@ private fun setupTypeInfo(
             i < 9 -> 15 - i - 1 + 1
             else -> 15 - i - 1
         }
-        modules[8][col] = !test && bits.shr(i).and(1) == 1
-        reserved[8][col] = true
+        modules[8, col] = !test && bits.shr(i).and(1) == 1
+        reserved[8, col] = true
     }
 
     // fixed module
-    modules[size - 8][8] = !test
-    reserved[size - 8][8] = true
+    modules[size - 8, 8] = !test
+    reserved[size - 8, 8] = true
 }
 
-private fun setupVersionNumber(
-    modules: Array<BooleanArray>,
-    reserved: Array<BooleanArray>,
-    version: Int,
-    test: Boolean,
-) {
+private fun setupVersionNumber(modules: Bitmap, reserved: Bitmap, version: Int, test: Boolean) {
     val bits = QrUtil.getBchTypeNumber(version)
     val size = modules.size
 
@@ -205,25 +212,20 @@ private fun setupVersionNumber(
         val mod = !test && bits.shr(i).and(1) == 1
         val row = i / 3
         val col = (i % 3) + size - 8 - 3
-        modules[row][col] = mod
-        reserved[row][col] = true
+        modules[row, col] = mod
+        reserved[row, col] = true
     }
 
     repeat(18) { i ->
         val mod = !test && bits.shr(i).and(1) == 1
         val row = (i % 3) + size - 8 - 3
         val col = i / 3
-        modules[row][col] = mod
-        reserved[row][col] = true
+        modules[row, col] = mod
+        reserved[row, col] = true
     }
 }
 
-private fun mapData(
-    modules: Array<BooleanArray>,
-    reserved: Array<BooleanArray>,
-    data: List<Int>,
-    maskPattern: MaskPattern,
-) {
+private fun mapData(modules: Bitmap, reserved: Bitmap, data: List<Int>, maskPattern: MaskPattern) {
     var inc = -1
     var row = modules.size - 1
     var bitIndex = 7
@@ -237,8 +239,8 @@ private fun mapData(
         while (true) {
             repeat(2) { c ->
                 val cc = col - c
-                if (!reserved[row][cc]) {
-                    modules[row][cc] = maskFunc(row, cc).xor(
+                if (!reserved[row, cc]) {
+                    modules[row, cc] = maskFunc(row, cc).xor(
                         byteIndex < data.size && data[byteIndex].ushr(bitIndex).and(1) == 1
                     )
                     bitIndex -= 1
@@ -262,17 +264,17 @@ private fun mapData(
     }
 }
 
-private fun getLostPoint(matrix: Array<BooleanArray>): Double {
+private fun getLostPoint(matrix: Bitmap): Double {
     val size = matrix.size
     var lostPoint = .0
 
     // LEVEL1
     repeat(size) { row ->
         repeat(size) { col ->
-            val isDark = matrix[row][col]
+            val isDark = matrix[row, col]
             val sameCount = (-1..1).sumOf { r ->
                 if (row + r in 0..<size) (-1..1).count { c ->
-                    col + c in 0..<size && !(r == 0 && c == 0) && isDark == matrix[row + r][col + c]
+                    col + c in 0..<size && !(r == 0 && c == 0) && isDark == matrix[row + r, col + c]
                 } else 0
             }
 
@@ -284,7 +286,7 @@ private fun getLostPoint(matrix: Array<BooleanArray>): Double {
     repeat(size - 1) { row ->
         repeat(size - 1) { col ->
             val count = (0..1).sumOf { r ->
-                (0..1).count { c -> matrix[row + r][col + c] }
+                (0..1).count { c -> matrix[row + r, col + c] }
             }
             if (count == 0 || count == 4) lostPoint += 3
         }
@@ -293,19 +295,19 @@ private fun getLostPoint(matrix: Array<BooleanArray>): Double {
     // LEVEL3
     lostPoint += (0..<size).sumOf { row ->
         (0..<size - 6).count { col ->
-            (0..6).all { matrix[row][col + it].xor(it == 1 || it == 5) }
+            (0..6).all { matrix[row, col + it].xor(it == 1 || it == 5) }
         }
     } * 40.0
 
     lostPoint += (0..<size).sumOf { col ->
         (0..<size - 6).count { row ->
-            (0..6).all { matrix[row + it][col].xor(it == 1 || it == 5) }
+            (0..6).all { matrix[row + it, col].xor(it == 1 || it == 5) }
         }
     } * 40.0
 
     // LEVEL4
     val darkCount = (0..<size).sumOf { col ->
-        (0..<size).count { row -> matrix[row][col] }
+        (0..<size).count { row -> matrix[row, col] }
     }
 
     val ratio = abs((100.0 * darkCount) / size / size - 50) / 5

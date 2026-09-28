@@ -3,5 +3,6 @@
 /.gradle/
 local.properties
 kotlin-js-store
+/.kotlin
 /bin
 .DS_Store

@@ -28,13 +28,13 @@ class Tests {
 """.trim()
 
         val text = "http://www.example.com/ążśźęćńół"
-        val result = qr(text)
+        val result = Qr(text)
         assertEquals(
             expected,
             (0..<ceil(result.size / 2.0).toInt() + 1).joinToString("\n") { row ->
-                "█" + result.indices.joinToString("") {
-                    val first = !(result.getOrNull(row * 2 - 1)?.get(it) ?: false)
-                    val second = !(result.getOrNull(row * 2)?.get(it) ?: false)
+                "█" + (0..<result.size).joinToString("") {
+                    val first = !result[row * 2 - 1, it]
+                    val second = !result[row * 2, it]
                     if (first) (if (second) "█" else "▀") else (if (second) "▄" else " ")
                 } + "█"
             }
