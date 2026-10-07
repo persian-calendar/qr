@@ -20,7 +20,7 @@ internal class Bitmap(val size: Int) {
     }
     fun getOrFalse(x: Int, y: Int): Boolean {
         val index = x * size + y
-        return if (index in data.indices) data[index] else false
+        return index in data.indices && data[index]
     }
 }
 
