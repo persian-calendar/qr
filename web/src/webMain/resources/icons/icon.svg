@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+	<title>QR Code Generator</title>
+	<rect width="128" height="128" rx="28" fill="#0d1117"/>
+	<!-- Three finder patterns, which is what a scanner looks for first. -->
+	<g fill="#e6edf3">
+		<path d="M20 20h36v36H20zm6 6v24h24V26z"/>
+		<rect x="33" y="33" width="10" height="10"/>
+		<path d="M72 20h36v36H72zm6 6v24h24V26z"/>
+		<rect x="85" y="33" width="10" height="10"/>
+		<path d="M20 72h36v36H20zm6 6v24h24V78z"/>
+		<rect x="33" y="85" width="10" height="10"/>
+	</g>
+	<!-- A few data modules, so it reads as a code rather than three squares. -->
+	<g fill="#4c9aff">
+		<rect x="72" y="72" width="10" height="10"/>
+		<rect x="88" y="72" width="10" height="10"/>
+		<rect x="98" y="72" width="10" height="10"/>
+		<rect x="72" y="88" width="10" height="10"/>
+		<rect x="98" y="88" width="10" height="10"/>
+		<rect x="72" y="98" width="10" height="10"/>
+		<rect x="88" y="98" width="10" height="10"/>
+	</g>
+</svg>

@@ -5,4 +5,6 @@ local.properties
 kotlin-js-store
 /.kotlin
 /bin
+/web/build/
+/web/src/webMain/resources/icons/*.png
 .DS_Store

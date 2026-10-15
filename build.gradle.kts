@@ -58,3 +58,27 @@ tasks.withType<org.gradle.api.tasks.testing.AbstractTestTask>().configureEach {
         showStandardStreams = true
     }
 }
+
+val webIconsSvg = file("src/webMain/resources/icons/icon.svg")
+val webIconsDir = file("src/webMain/resources/icons")
+
+val generateWebIcons = tasks.register("generateWebIcons") {
+    description = "Generate PNG app icons from icon.svg using rsvg-convert"
+    inputs.file(webIconsSvg)
+    outputs.files(
+        webIconsDir.resolve("icon-192.png"),
+        webIconsDir.resolve("icon-512.png"),
+    )
+    doLast {
+        listOf(192, 512).forEach { size ->
+            val exit = ProcessBuilder(
+                "rsvg-convert",
+                "-w", size.toString(),
+                "-h", size.toString(),
+                webIconsSvg.absolutePath,
+                "-o", webIconsDir.resolve("icon-$size.png").absolutePath,
+            ).redirectErrorStream(true).start().waitFor()
+            check(exit == 0) { "rsvg-convert failed for size $size with exit code $exit" }
+        }
+    }
+}
