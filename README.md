@@ -67,6 +67,11 @@ cases can be moved from the command line:
 ./gradlew jvmTest -Dqr.fuzz.seed=12345 -Dqr.fuzz.cases=5000
 ```
 
+CI runs it twice over: once inside `jvmTest` with the default 400 cases, and again in a job
+of its own with 5000 cases and a seed taken from the run number, so every run explores
+payloads no earlier run did. The test prints the seed it used, and the workflow can be
+started by hand with `fuzz-seed` set to that number to replay the same cases.
+
 # Web demo
 
 There is a small demo of this library in the [web](web) module, which encodes to JavaScript

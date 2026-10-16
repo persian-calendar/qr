@@ -5,6 +5,11 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
+    inputs:
+      fuzz-seed:
+        description: Seed for the fuzz job, to replay a failure
+        required: false
 
 jobs:
   test:
@@ -35,3 +40,33 @@ jobs:
       - name: Test with Gradle
         shell: bash
         run: ./gradlew ${{ matrix.gradle-tasks }}
+
+  # The round trip tests run in the job above like any other test, with a fixed seed and a
+  # small number of cases. This job is the fuzzer itself, which is worth running with many
+  # more cases than a test run should take: a seed of its own per run so that each one
+  # explores payloads no earlier run did, and enough cases to be worth starting a job for.
+  #
+  # The seed is the run number, which keeps a failure reproducible - the test prints the seed
+  # it used, and this workflow can be started by hand with `fuzz-seed` set to that number to
+  # replay exactly the same cases:
+  #
+  #     ./gradlew jvmTest --tests '*FuzzRoundTripTest*' -Dqr.fuzz.seed=<seed> -Dqr.fuzz.cases=5000
+  fuzz:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Fuzz the encoder
+        shell: bash
+        env:
+          FUZZ_SEED: ${{ inputs.fuzz-seed || github.run_number }}
+        run: ./gradlew jvmTest --tests '*FuzzRoundTripTest*' -Dqr.fuzz.seed="$FUZZ_SEED" -Dqr.fuzz.cases=5000
