@@ -50,6 +50,15 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
+
+        // The round-trip test decodes what this library encodes, so it needs a decoder
+        // that has nothing to do with this library. ZXing is the well known one, and it is
+        // a Java library, which is why that test lives in jvmTest rather than in
+        // commonTest: it still runs on every platform's CI through `jvmTest`, and no
+        // decoder has to be found for each of the other targets.
+        jvmTest.dependencies {
+            implementation("com.google.zxing:core:3.5.3")
+        }
     }
 }
 
@@ -59,26 +68,15 @@ tasks.withType<org.gradle.api.tasks.testing.AbstractTestTask>().configureEach {
     }
 }
 
-val webIconsSvg = file("src/webMain/resources/icons/icon.svg")
-val webIconsDir = file("src/webMain/resources/icons")
-
-val generateWebIcons = tasks.register("generateWebIcons") {
-    description = "Generate PNG app icons from icon.svg using rsvg-convert"
-    inputs.file(webIconsSvg)
-    outputs.files(
-        webIconsDir.resolve("icon-192.png"),
-        webIconsDir.resolve("icon-512.png"),
-    )
-    doLast {
-        listOf(192, 512).forEach { size ->
-            val exit = ProcessBuilder(
-                "rsvg-convert",
-                "-w", size.toString(),
-                "-h", size.toString(),
-                webIconsSvg.absolutePath,
-                "-o", webIconsDir.resolve("icon-$size.png").absolutePath,
-            ).redirectErrorStream(true).start().waitFor()
-            check(exit == 0) { "rsvg-convert failed for size $size with exit code $exit" }
+// The fuzz test takes its seed and its number of cases from the command line. A test runs in
+// a JVM of its own, so the values have to be handed to it, and they have to be declared as
+// inputs as well - otherwise Gradle would consider a task it had already run up to date and
+// the flags would silently do nothing.
+tasks.withType<Test>().configureEach {
+    listOf("qr.fuzz.seed", "qr.fuzz.cases").forEach { name ->
+        System.getProperty(name)?.let {
+            systemProperty(name, it)
+            inputs.property(name, it)
         }
     }
 }

@@ -47,3 +47,27 @@ dependencies {
 ```
 
 For other build tools support have a look at [this](https://jitpack.io/#persian-calendar/qr).
+
+# Tests
+
+`jvmTest` decodes what this library encodes with
+[ZXing](https://github.com/zxing/zxing), and the text has to come back exactly as it went
+in. ZXing shares no code with this library, and reading the message back exercises the whole
+of the standard at once: the mode and the character count, the padding, the Reed-Solomon
+blocks and their error correction, the mask, the format and the version information, and the
+placement of all of it. A few of the tests go through a drawn image as well, so that a
+scanner's view of the code - the finder, timing and alignment patterns - is covered too.
+
+There is also a fuzzer, which throws random payloads at the encoder and decodes every one of
+them back. It is seeded, so a failure can be replayed, and both the seed and the number of
+cases can be moved from the command line:
+
+```sh
+./gradlew jvmTest
+./gradlew jvmTest -Dqr.fuzz.seed=12345 -Dqr.fuzz.cases=5000
+```
+
+# Web demo
+
+There is a small demo of this library in the [web](web) module, which encodes to JavaScript
+and to WebAssembly and draws the code in the browser.
