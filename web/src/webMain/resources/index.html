@@ -275,10 +275,13 @@ footer a { color: var(--accent); }
 		<p>QR Code is a registered trademark of DENSO WAVE INCORPORATED.</p>
 	</footer>
 
-    <script>
-        // if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
-	</script>
 	<script src="main.js"></script>
 	<script src="web.js"></script>
+	<script>
+		// if ('serviceWorker' in navigator &&
+		// 	location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+		// 	navigator.serviceWorker.register('sw.js');
+		// }
+	</script>
 </body>
 </html>
