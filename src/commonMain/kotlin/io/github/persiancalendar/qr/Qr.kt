@@ -1,6 +1,5 @@
 package io.github.persiancalendar.qr
 
-import kotlin.jvm.JvmInline
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -18,6 +17,7 @@ internal class Bitmap(val size: Int) {
     operator fun set(x: Int, y: Int, value: Boolean) {
         data[x * size + y] = value
     }
+
     fun getOrFalse(x: Int, y: Int): Boolean {
         val index = x * size + y
         return index in data.indices && data[index]
@@ -29,8 +29,7 @@ internal class Bitmap(val size: Int) {
  * a scanner needs left to whoever draws it, since that margin takes the colour of the surface
  * the code sits on. Four modules a side is the least ISO/IEC 18004 asks for.
  */
-@JvmInline
-value class Qr internal constructor(private val data: Bitmap) {
+class Qr internal constructor(private val data: Bitmap) {
     /** Modules a side, the quiet zone not counted. */
     val size get() = data.size
 
