@@ -48,6 +48,16 @@ dependencies {
 
 For other build tools support have a look at [this](https://jitpack.io/#persian-calendar/qr).
 
+# The quiet zone
+
+`Qr` is the encoding region alone: `size` counts the modules of the symbol and `get(x, y)`
+reads them, with no margin around it. A scanner wants a light border of at least four
+modules on every side, which ISO/IEC 18004 asks for, but that margin encodes nothing: it is
+the surface the symbol sits on, and its colour has to match whatever is behind the code. So
+the library leaves it to whoever draws the matrix, as the [web demo](web) does by filling
+four modules of white into its canvas and its SVG, which also means a file it exports
+carries its own margin.
+
 # Tests
 
 `jvmTest` decodes what this library encodes with

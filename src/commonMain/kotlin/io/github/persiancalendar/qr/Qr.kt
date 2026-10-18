@@ -24,8 +24,14 @@ internal class Bitmap(val size: Int) {
     }
 }
 
+/**
+ * An immutable dot matrix of a QR symbol: the encoding region only, with the quiet zone that
+ * a scanner needs left to whoever draws it, since that margin takes the colour of the surface
+ * the code sits on. Four modules a side is the least ISO/IEC 18004 asks for.
+ */
 @JvmInline
 value class Qr internal constructor(private val data: Bitmap) {
+    /** Modules a side, the quiet zone not counted. */
     val size get() = data.size
 
     // Let's provide a relaxed API for a client
