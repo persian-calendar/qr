@@ -17,7 +17,9 @@ fun main() {
             "H" -> ErrorCorrectionLevel.H
             else -> null
         }
-        try {
+        // Too much text for any version is a normal thing to type, not a crash: the page is
+        // handed an empty answer and says so.
+        runCatching {
             val qr = Qr(text, level, version.takeIf { it in 1..40 })
             buildString(qr.size * (qr.size + 1)) {
                 for (y in 0 until qr.size) {
@@ -25,9 +27,6 @@ fun main() {
                     append('\n')
                 }
             }
-        } catch (error: Exception) {
-            // Too much text for any version is a normal thing to type, not a crash.
-            ""
-        }
+        }.getOrNull().orEmpty()
     }
 }
