@@ -57,7 +57,7 @@ kotlin {
         // commonTest: it still runs on every platform's CI through `jvmTest`, and no
         // decoder has to be found for each of the other targets.
         jvmTest.dependencies {
-            implementation("com.google.zxing:core:3.5.3")
+            implementation("com.google.zxing:core:3.5.4")
         }
     }
 }
