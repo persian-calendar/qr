@@ -75,8 +75,8 @@ class FuzzRoundTripTest {
 
     private fun decode(qr: Qr): String {
         val matrix = BitMatrix(qr.size, qr.size)
-        for (y in 0 until qr.size) {
-            for (x in 0 until qr.size) {
+        repeat(qr.size) { y ->
+            repeat(qr.size) { x ->
                 if (qr[x, y]) matrix.set(x, y)
             }
         }
@@ -103,14 +103,15 @@ class FuzzRoundTripTest {
         repeat(cases) { index ->
             val text = payload(random)
             val expected = asWritten(text)
-            val level = if (random.nextInt(4) == 0) null else ErrorCorrectionLevel.entries.random(random)
+            val level =
+                if (random.nextInt(4) == 0) null else ErrorCorrectionLevel.entries.random(random)
             val version = when (random.nextInt(10)) {
                 0, 1, 2 -> null // let the encoder choose
                 3 -> 1 + random.nextInt(40) // a demand, sometimes an impossible one
                 else -> 1 + random.nextInt(40)
             }
-            val what = "case $index, seed $seed: ${text.length} characters, level ${level ?: "default"}, " +
-                "version ${version ?: "auto"}"
+            val what =
+                "case $index, seed $seed: ${text.length} characters, level ${level ?: "default"}, " + "version ${version ?: "auto"}"
 
             val qr = try {
                 Qr(text, level, version)
@@ -162,16 +163,15 @@ class FuzzRoundTripTest {
         // Guard the guard: a run that only ever produced tiny codes would pass while
         // covering almost nothing, so make sure the random choices actually spread out.
         println(
-            "fuzz seed $seed: $cases cases, versions ${coverage.versions.min()}..${coverage.versions.max()} " +
-                "(${coverage.versions.size} distinct), ${coverage.levels.size} levels, " +
-                "largest payload ${coverage.largest} bytes, " +
-                "auto ${coverage.autoVersionCases}, fixed ${coverage.fixedVersionCases}, " +
-                "refused ${coverage.tooSmallVersionCases + coverage.tooLongCases}",
+            "fuzz seed $seed: $cases cases, versions ${coverage.versions.min()}..${coverage.versions.max()} " + "(${coverage.versions.size} distinct), ${coverage.levels.size} levels, " + "largest payload ${coverage.largest} bytes, " + "auto ${coverage.autoVersionCases}, fixed ${coverage.fixedVersionCases}, " + "refused ${coverage.tooSmallVersionCases + coverage.tooLongCases}",
         )
         assertTrue(coverage.versions.size >= 10, "only reached versions ${coverage.versions}")
         assertTrue(coverage.levels.size >= 3, "only reached levels ${coverage.levels}")
         assertTrue(coverage.largest >= 2000, "largest payload was only ${coverage.largest} bytes")
-        assertTrue(coverage.autoVersionCases > 0 && coverage.fixedVersionCases > 0, "one path was never taken")
+        assertTrue(
+            coverage.autoVersionCases > 0 && coverage.fixedVersionCases > 0,
+            "one path was never taken"
+        )
     }
 
     @Test
@@ -187,7 +187,9 @@ class FuzzRoundTripTest {
                 val qr = try {
                     Qr(text, level, version)
                 } catch (error: IllegalStateException) {
-                    assertTrue(error.message?.contains("overflow") == true, "$what: ${error.message}")
+                    assertTrue(
+                        error.message?.contains("overflow") == true, "$what: ${error.message}"
+                    )
                     continue
                 }
                 assertEquals(expected = asWritten(text), actual = decode(qr), message = what)

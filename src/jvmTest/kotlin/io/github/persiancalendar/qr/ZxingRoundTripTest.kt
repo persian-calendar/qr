@@ -46,8 +46,8 @@ class ZxingRoundTripTest {
     private fun decodeModules(qr: Qr, what: String): String {
         assertTrue(qr.size > 0, "the encoder produced an empty code for $what")
         val matrix = BitMatrix(qr.size, qr.size)
-        for (y in 0 until qr.size) {
-            for (x in 0 until qr.size) {
+        repeat(qr.size) { y ->
+            repeat(qr.size) { x ->
                 if (qr[x, y]) matrix.set(x, y)
             }
         }
@@ -72,12 +72,12 @@ class ZxingRoundTripTest {
         assertTrue(qr.size > 0, "the encoder produced an empty code for $what")
         val side = (qr.size + quietZone * 2) * scale
         val pixels = IntArray(side * side) { WHITE }
-        for (y in 0 until qr.size) {
-            for (x in 0 until qr.size) {
-                if (!qr[x, y]) continue
-                for (dy in 0 until scale) {
+        repeat(qr.size) { y ->
+            (0..<qr.size).forEach { x ->
+                if (!qr[x, y]) return@forEach
+                for (dy in 0..<scale) {
                     val row = (y + quietZone) * scale + dy
-                    for (dx in 0 until scale) {
+                    for (dx in 0..<scale) {
                         pixels[row * side + (x + quietZone) * scale + dx] = BLACK
                     }
                 }
@@ -99,8 +99,11 @@ class ZxingRoundTripTest {
     /** The version the encoder settled on, read back from the width of the code. */
     private fun versionOf(qr: Qr): Int = (qr.size - 17) / 4
 
-    private fun assertRoundTrip(text: String, level: ErrorCorrectionLevel? = null, version: Int? = null) {
-        val what = "text of ${text.length} characters, level ${level ?: "default"}, version ${version ?: "auto"}"
+    private fun assertRoundTrip(
+        text: String, level: ErrorCorrectionLevel? = null, version: Int? = null
+    ) {
+        val what =
+            "text of ${text.length} characters, level ${level ?: "default"}, version ${version ?: "auto"}"
         assertEquals(text, decodeModules(Qr(text, level, version), what), what)
     }
 
@@ -128,7 +131,9 @@ class ZxingRoundTripTest {
             val qr = Qr("v$version", ErrorCorrectionLevel.M, version)
             assertEquals(version * 4 + 17, qr.size, "version $version should be that wide")
             assertEquals("v$version", decodeModules(qr, "version $version"), "version $version")
-            assertEquals("v$version", decodeImage(qr, "version $version as an image"), "version $version")
+            assertEquals(
+                "v$version", decodeImage(qr, "version $version as an image"), "version $version"
+            )
         }
     }
 
@@ -180,7 +185,9 @@ class ZxingRoundTripTest {
         for ((level, capacity) in capacities) {
             val text = String(CharArray(capacity) { 'x' })
             val qr = Qr(text, level)
-            assertEquals(40, versionOf(qr), "level $level at $capacity bytes should need version 40")
+            assertEquals(
+                40, versionOf(qr), "level $level at $capacity bytes should need version 40"
+            )
             assertEquals(text, decodeModules(qr, "level $level at $capacity bytes"), "level $level")
 
             assertEquals(0, Qr("$text*", level).size, "one byte past level $level should not fit")
@@ -221,13 +228,15 @@ class ZxingRoundTripTest {
         }
         // A fixed version is a demand, so a short payload is used for the small ones.
         for (version in listOf(1, 10, 25, 40)) {
-            assertEquals(render(Qr("qr", null, version)), render(Qr("qr", null, version)), "version $version")
+            assertEquals(
+                render(Qr("qr", null, version)), render(Qr("qr", null, version)), "version $version"
+            )
         }
     }
 
     private fun render(qr: Qr): String = buildString {
-        for (y in 0 until qr.size) {
-            for (x in 0 until qr.size) append(if (qr[x, y]) '1' else '0')
+        repeat(qr.size) { y ->
+            repeat(qr.size) { x -> append(if (qr[x, y]) '1' else '0') }
             append('\n')
         }
     }
